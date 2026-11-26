@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="UTD Campus EMS location drills: name and find campus buildings, lots and apartment phases.">
+<link rel="icon" href="ems-logo.png">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>UTD Campus Run</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: dispatch console. Left rail = call card + controls, right = the campus map, full height. Stacks on phones. */
+:root{
+  --bg:#EEF2EF; --panel:#FFFFFF; --ink:#16231C; --muted:#56685D; --line:#D2DCD5;
+  --ems:#00339C; --ems-ink:#FFFFFF; --alert:#D2381F; --ok:#1E8A4C; --warn:#B7791F; --chip:#E1E9E3;
+  --map-bg:#F7F7F5; --stripe:#E46F25; --brand:#2D5F3C;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1612; --panel:#16221B; --ink:#E6EEE9; --muted:#97AA9E; --line:#26372D;
+  --ems:#7FA2F0; --ems-ink:#07122A; --alert:#FF6A4D; --ok:#43C27C; --warn:#E3AC4A; --chip:#1D2C23;
+  --map-bg:#1B2620; --stripe:#F08A4B; --brand:#5FAE7E; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1612; --panel:#16221B; --ink:#E6EEE9; --muted:#97AA9E; --line:#26372D;
+  --ems:#7FA2F0; --ems-ink:#07122A; --alert:#FF6A4D; --ok:#43C27C; --warn:#E3AC4A; --chip:#1D2C23;
+  --map-bg:#1B2620; --stripe:#F08A4B; --brand:#5FAE7E; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;box-sizing:border-box}
+*,*::before,*::after{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--ems);outline-offset:2px}
+.app{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:16px;height:100%;min-height:560px}
+.rail{display:flex;flex-direction:column;gap:12px;min-width:0;overflow:auto;padding-bottom:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .logo{width:64px;height:auto;flex:none;max-width:none}
+.brand h1{font-family:var(--f-display);font-weight:800;font-size:28px;letter-spacing:.02em;margin:0;line-height:1;text-transform:uppercase}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.livery{flex:none;height:6px;border-radius:3px;background:repeating-linear-gradient(-45deg,var(--stripe) 0 10px,var(--brand) 10px 20px)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.eyebrow{font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:13px;color:var(--muted);margin:0 0 8px}
+.seg{display:grid;gap:6px}
+.seg.three{grid-template-columns:repeat(3,1fr)} .seg.two{grid-template-columns:repeat(2,1fr)}
+.opt{border:1.5px solid var(--line);background:transparent;border-radius:9px;padding:8px 10px;text-align:left;min-width:0}
+.opt b{display:block;font-family:var(--f-display);font-size:18px;text-transform:uppercase;letter-spacing:.03em}
+.opt span{display:block;font-size:12px;color:var(--muted);line-height:1.3}
+.opt[aria-pressed="true"]{border-color:var(--ems);background:color-mix(in srgb,var(--ems) 10%,transparent)}
+.btn{border:0;border-radius:9px;padding:10px 14px;font-family:var(--f-display);font-weight:700;font-size:18px;text-transform:uppercase;letter-spacing:.04em;background:var(--chip)}
+.btn.primary{background:var(--ems);color:var(--ems-ink)}
+.brand h1{color:var(--brand)}
+.btn.danger{background:var(--alert);color:#fff}
+.btn.small{font-size:14px;padding:6px 10px}
+.btn:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grow{flex:1}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left}
+th{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.callcard{border-left:6px solid var(--brand)}
+.callhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.callno{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.prompt{font-family:var(--f-display);font-weight:700;font-size:26px;line-height:1.1;margin:6px 0 4px;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.hud{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.hud div{background:var(--chip);border-radius:8px;padding:6px 8px}
+.hud small{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.hud b{font-family:var(--f-mono);font-size:20px;font-variant-numeric:tabular-nums}
+input[type=text]{width:100%;font:inherit;font-size:17px;padding:10px 12px;border-radius:9px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+.feedback{border-radius:9px;padding:10px 12px;font-size:14px}
+.feedback.good{background:color-mix(in srgb,var(--ok) 14%,transparent);border:1px solid var(--ok)}
+.feedback.bad{background:color-mix(in srgb,var(--alert) 12%,transparent);border:1px solid var(--alert)}
+.feedback.mid{background:color-mix(in srgb,var(--warn) 14%,transparent);border:1px solid var(--warn)}
+.feedback h3{margin:0 0 2px;font-family:var(--f-display);font-size:20px;text-transform:uppercase;letter-spacing:.03em}
+.pts{font-family:var(--f-mono);font-weight:700}
+.mapwrap{position:relative;min-width:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--map-bg)}
+#viewport{position:absolute;inset:0;touch-action:none;cursor:grab;overflow:hidden;user-select:none;-webkit-user-select:none}
+#viewport.drawing{cursor:crosshair}
+#stage{position:absolute;left:0;top:0;width:1545px;height:2000px;transform-origin:0 0}
+#stage img{position:absolute;inset:0;width:1545px;height:2000px;max-width:none;pointer-events:none;-webkit-user-drag:none}
+#overlay{position:absolute;inset:0;width:1545px;height:2000px;overflow:visible}
+.mapctl{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px;z-index:3}
+.mapctl button{width:40px;height:40px;border-radius:9px;border:1px solid var(--line);background:var(--panel);font-family:var(--f-display);font-weight:700;font-size:20px}
+.mapctl button[aria-pressed="true"]{background:var(--ems);color:var(--ems-ink);border-color:var(--ems)}
+.maptag{position:absolute;left:10px;top:10px;z-index:3;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:12px;color:var(--muted);max-width:calc(100% - 80px)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.lb-row td:first-child{width:28px;font-family:var(--f-mono);color:var(--muted)}
+.lb-me{background:color-mix(in srgb,var(--ems) 10%,transparent)}
+.avatar{width:22px;height:22px;border-radius:50%;vertical-align:middle;margin-right:6px}
+.tabs{display:flex;gap:4px;margin-bottom:8px}
+.tabs button{flex:1;border:1px solid var(--line);background:transparent;border-radius:7px;padding:5px;font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.note{font-size:12px;color:var(--muted)}
+details summary{cursor:pointer;font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:14px;color:var(--muted)}
+.misslist{margin:6px 0 0;padding-left:18px;font-size:13px}
+.misslist li{margin:2px 0}
+code{font-family:var(--f-mono);font-size:.92em;background:var(--chip);padding:0 4px;border-radius:4px}
+@keyframes pulse{0%{r:14;opacity:1}100%{r:44;opacity:0}}
+.pulse{animation:pulse 1.4s ease-out infinite}
+@media (prefers-reduced-motion: reduce){.pulse{animation:none}}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto minmax(440px,62vh);height:auto}
+  .rail{overflow:visible;order:1}
+  .mapwrap{order:2;height:62vh;min-height:440px}
+  body.playing .mapwrap{height:56vh;min-height:360px}
+  body.playing .brand, body.playing .livery{display:none}
+  body.playing .rail{gap:8px}
+  .prompt{font-size:22px}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <section class="rail" id="rail" aria-live="polite"></section>
+  <section class="mapwrap" aria-label="UTD campus map">
+    <div id="viewport">
+      <div id="stage">
+        <img id="mapimg" src="map-blank.jpg" alt="UTD campus map" width="1545" height="2000">
+        <svg id="overlay" viewBox="0 0 1545 2000"></svg>
+      </div>
+    </div>
+    <div class="maptag" id="maptag">Scroll or pinch to zoom · drag to move</div>
+    <div class="mapctl">
+      <button id="zin" title="Zoom in" aria-label="Zoom in">+</button>
+      <button id="zout" title="Zoom out" aria-label="Zoom out">−</button>
+      <button id="zfit" title="Fit whole campus" aria-label="Fit whole campus" style="font-size:13px">FIT</button>
+      <button id="panbtn" title="Move the map instead of drawing" aria-label="Move map mode" aria-pressed="false" hidden style="font-size:12px">MOVE</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const LOCS = [{"id":"SP2","label":"SP2","cat":"acad","x":558,"y":105,"name":"Synergy Park 2"},{"id":"SPN","label":"SPN","cat":"acad","x":658,"y":212,"name":"Synergy Park North"},{"id":"WSTC","label":"WSTC","cat":"acad","x":178,"y":442,"name":"Waterview Science and Technology Center"},{"id":"RL","label":"RL","cat":"acad","x":828,"y":378},{"id":"BSB","label":"BSB","cat":"acad","x":855,"y":495,"name":"Bioengineering and Sciences Building"},{"id":"CR","label":"CR","cat":"acad","x":975,"y":383,"name":"Callier Center Richardson","al":["callier"]},{"id":"CRA","label":"CRA","cat":"acad","x":1005,"y":468,"name":"Callier Center Richardson Addition"},{"id":"FM","label":"FM","cat":"acad","x":1125,"y":405,"name":"Facilities Management"},{"id":"PD","label":"PD","cat":"acad","x":1268,"y":472,"name":"UTD Police Department","al":["police","utd police","police department"]},{"id":"SB","label":"SB","cat":"acad","x":1200,"y":515},{"id":"SG","label":"SG","cat":"acad","x":1158,"y":560},{"id":"NL","label":"NL","cat":"acad","x":925,"y":622,"name":"Natural Science and Engineering Research Laboratory","al":["nserl"]},{"id":"NB","label":"NB","cat":"acad","x":925,"y":651},{"id":"CB","label":"CB","cat":"acad","x":928,"y":692,"name":"Classroom Building"},{"id":"AD","label":"AD","cat":"acad","x":1040,"y":693,"name":"Administration Building","al":["administration"]},{"id":"PHA","label":"PHA","cat":"acad","x":873,"y":694,"name":"Physics Annex"},{"id":"PHY","label":"PHY","cat":"acad","x":832,"y":733,"name":"Physics Building","al":["physics"]},{"id":"SCI","label":"SCI","cat":"acad","x":825,"y":780,"name":"Sciences Building"},{"id":"JO","label":"JO","cat":"acad","x":980,"y":787,"name":"Erik Jonsson Academic Center","al":["jonsson"]},{"id":"TH","label":"TH","cat":"acad","x":987,"y":830,"name":"Theatre","al":["theater"]},{"id":"GR","label":"GR","cat":"acad","x":1063,"y":811,"name":"Cecil H. Green Hall","al":["green hall"]},{"id":"EP","label":"EP","cat":"acad","x":750,"y":845,"name":"Energy Plant"},{"id":"SLC","label":"SLC","cat":"acad","x":828,"y":862,"name":"Science Learning Center"},{"id":"FN","label":"FN","cat":"acad","x":920,"y":870,"name":"Founders North"},{"id":"FO","label":"FO","cat":"acad","x":950,"y":915,"name":"Founders Building","al":["founders"]},{"id":"BE","label":"BE","cat":"acad","x":822,"y":917,"name":"Berkner Hall","al":["berkner"]},{"id":"FA","label":"FA","cat":"acad","x":877,"y":951,"name":"Founders Annex"},{"id":"HH","label":"HH","cat":"acad","x":715,"y":1003,"name":"Hoblitzelle Hall","al":["hoblitzelle"]},{"id":"ML2","label":"ML2","cat":"acad","x":563,"y":1007,"name":"Modular Lab 2"},{"id":"ML1","label":"ML1","cat":"acad","x":622,"y":1007,"name":"Modular Lab 1"},{"id":"ECSN","label":"ECSN","cat":"acad","x":832,"y":995,"name":"Engineering and Computer Science North"},{"id":"SUFC","label":"SUFC","cat":"acad","x":922,"y":1019},{"id":"SU","label":"SU","cat":"acad","x":975,"y":1001,"name":"Student Union"},{"id":"MC","label":"MC","cat":"acad","x":1085,"y":996,"name":"Eugene McDermott Library","al":["mcdermott library","library"]},{"id":"ECSS","label":"ECSS","cat":"acad","x":830,"y":1073,"name":"Engineering and Computer Science South"},{"id":"SSA","label":"SSA","cat":"acad","x":918,"y":1073,"name":"Student Services Building Addition"},{"id":"SSB","label":"SSB","cat":"acad","x":972,"y":1104,"name":"Student Services Building"},{"id":"ATC","label":"ATC","cat":"acad","x":1084,"y":1100,"name":"Edith O'Donnell Arts and Technology Building","al":["arts and technology"]},{"id":"DGA","label":"DGA","cat":"acad","x":1187,"y":1084,"name":"Davidson-Gundy Alumni Center","al":["alumni center"]},{"id":"ECSW","label":"ECSW","cat":"acad","x":725,"y":1068,"name":"Engineering and Computer Science West"},{"id":"AB","label":"AB","cat":"acad","x":906,"y":1194,"name":"Activity Center","al":["activity center"]},{"id":"VCB","label":"VCB","cat":"acad","x":894,"y":1253,"name":"Visitor Center and University Bookstore","al":["bookstore","visitor center"]},{"id":"JSOM","label":"JSOM","cat":"acad","x":1105,"y":1231,"name":"Naveen Jindal School of Management","al":["jindal"]},{"id":"APC","label":"APC","cat":"acad","x":1117,"y":1368},{"id":"ROW","label":"ROW","cat":"acad","x":70,"y":1075,"name":"Research and Operations West"},{"id":"ROC","label":"ROC","cat":"acad","x":204,"y":1068,"name":"Research and Operations Center"},{"id":"RHVega","label":"Vega Hall (RHV)","cat":"res","x":463,"y":510,"name":"Vega Hall / Residence Hall Northwest","al":["rhv","vega","rhvega","northwest","residence hall northwest"]},{"id":"RHC","label":"Capella Hall (RHC)","cat":"res","x":705,"y":520,"name":"Capella Hall / Residence Hall North","al":["rhc","capella","north","residence hall north"]},{"id":"RHA","label":"Andromeda Hall (RHA)","cat":"res","x":455,"y":615,"name":"Andromeda Hall","al":["rha","andromeda"]},{"id":"RHW","label":"Residence Hall West","cat":"res","x":355,"y":630,"name":"Residence Hall West","al":["west","rhw","residence hall west"]},{"id":"RCW","label":"RCW","cat":"res","x":373,"y":659,"name":"Residence Commons West","al":["rcw"]},{"id":"DHW","label":"Dining Hall West (DHW)","cat":"res","x":444,"y":669,"name":"Dining Hall West","al":["dhw","dining hall west","dining hall"]},{"id":"RHH","label":"Helix Hall (RHH)","cat":"res","x":600,"y":640,"name":"Helix Hall / Residence Hall Southwest","al":["rhh","helix","rhhelix","southwest","residence hall southwest"]},{"id":"RHS","label":"Sirius Hall (RHS)","cat":"res","x":712,"y":642,"name":"Sirius Hall / Residence Hall South","al":["rhs","sirius","south","residence hall south"]},{"id":"UVO","label":"UV Housing Office","cat":"res","x":412,"y":725,"name":"University Village Housing Office","al":["uv housing office","housing office","uv office","university village office"]},{"id":"CH7","label":"Canyon Creek North (CH7)","cat":"res","x":370,"y":1590,"name":"Canyon Creek North","al":["ch7","canyon creek north"]},{"id":"CH6","label":"Canyon Creek South (CH6)","cat":"res","x":372,"y":1695,"name":"Canyon Creek South","al":["ch6","canyon creek south"]},{"id":"PS1","label":"PS1","cat":"ps","x":1287,"y":1099,"name":"Parking Structure 1","al":["parking structure 1","ps 1","garage 1"]},{"id":"PS3","label":"PS3","cat":"ps","x":834,"y":630,"name":"Parking Structure 3","al":["parking structure 3","ps 3","garage 3"]},{"id":"PS4","label":"PS4","cat":"ps","x":585,"y":1086,"name":"Parking Structure 4","al":["parking structure 4","ps 4","garage 4"]},{"id":"LotW","label":"Lot W","cat":"lot","x":103,"y":437,"name":"Lot W","al":["lot w","w","parking lot w"]},{"id":"LotTO","label":"Lot T Overflow","cat":"lot","x":350,"y":393,"name":"Lot T Overflow","al":["lot t overflow","t overflow","overflow"]},{"id":"LotT","label":"Lot T","cat":"lot","x":607,"y":392,"name":"Lot T","al":["lot t","t","parking lot t"]},{"id":"ResNW","label":"Res Lot Northwest","cat":"lot","x":390,"y":505,"name":"Res Lot Northwest","al":["res lot northwest","residence lot northwest","res lot nw","northwest lot"]},{"id":"ResN","label":"Res Lot North","cat":"lot","x":578,"y":482,"name":"Res Lot North","al":["res lot north","residence lot north","north res lot"]},{"id":"SPNLot","label":"SPN Lot","cat":"lot","x":625,"y":265,"name":"SPN Lot","al":["spn lot","synergy park north lot"]},{"id":"LotN","label":"Lot N","cat":"lot","x":1018,"y":357,"name":"Lot N","al":["lot n","n","parking lot n"]},{"id":"LotS","label":"Lot S","cat":"lot","x":1112,"y":365,"name":"Lot S","al":["lot s","s","parking lot s"]},{"id":"LotP","label":"Lot P","cat":"lot","x":833,"y":553,"name":"Lot P","al":["lot p","p","parking lot p"]},{"id":"LotR","label":"Lot R","cat":"lot","x":1048,"y":635,"name":"Lot R","al":["lot r","r","parking lot r"]},{"id":"LotA1","label":"Lot A","cat":"lot","x":1306,"y":590,"name":"Lot A","al":["lot a","a","parking lot a"],"g":"LotA"},{"id":"LotA2","label":"Lot A","cat":"lot","x":1198,"y":712,"name":"Lot A","al":["lot a","a","parking lot a"],"g":"LotA"},{"id":"LotB1","label":"Lot B","cat":"lot","x":1366,"y":712,"name":"Lot B","al":["lot b","b","parking lot b"],"g":"LotB"},{"id":"LotB2","label":"Lot B","cat":"lot","x":1244,"y":805,"name":"Lot B","al":["lot b","b","parking lot b"],"g":"LotB"},{"id":"LotC1","label":"Lot C","cat":"lot","x":1415,"y":856,"name":"Lot C","al":["lot c","c","parking lot c"],"g":"LotC"},{"id":"LotC2","label":"Lot C","cat":"lot","x":1336,"y":915,"name":"Lot C","al":["lot c","c","parking lot c"],"g":"LotC"},{"id":"LotD","label":"Lot D","cat":"lot","x":1370,"y":992,"name":"Lot D","al":["lot d","d","parking lot d"]},{"id":"LotH","label":"Lot H","cat":"lot","x":592,"y":900,"name":"Lot H","al":["lot h","h","parking lot h"]},{"id":"LotI","label":"Lot I","cat":"lot","x":590,"y":1030,"name":"Lot I","al":["lot i","i","parking lot i"]},{"id":"LotV","label":"Lot V","cat":"lot","x":128,"y":1075,"name":"Lot V","al":["lot v","v","parking lot v"]},{"id":"LotJ1","label":"Lot J","cat":"lot","x":812,"y":1268,"name":"Lot J","al":["lot j","j","parking lot j"],"g":"LotJ"},{"id":"LotJ2","label":"Lot J","cat":"lot","x":825,"y":1340,"name":"Lot J","al":["lot j","j","parking lot j"],"g":"LotJ"},{"id":"LotF","label":"Lot F","cat":"lot","x":932,"y":1291,"name":"Lot F","al":["lot f","f","parking lot f"]},{"id":"LotMN","label":"Lot M North","cat":"lot","x":1222,"y":1279,"name":"Lot M North","al":["lot m north","m north"]},{"id":"LotME","label":"Lot M East","cat":"lot","x":1210,"y":1370,"name":"Lot M East","al":["lot m east","m east"]},{"id":"LotMS","label":"Lot M South","cat":"lot","x":1158,"y":1510,"name":"Lot M South","al":["lot m south","m south"]},{"id":"LotMSE1","label":"Lot M South East 1","cat":"lot","x":1242,"y":1515,"name":"Lot M South East 1","al":["lot m south east 1","m south east 1","lot m southeast 1","m se1","m se 1","lot m se1","lot m se 1"]},{"id":"LotMSE2","label":"Lot M South East 2","cat":"lot","x":1245,"y":1640,"name":"Lot M South East 2","al":["lot m south east 2","m south east 2","lot m southeast 2","m se2","m se 2","lot m se2","lot m se 2"]},{"id":"LotU","label":"Lot U","cat":"lot","x":818,"y":1665,"name":"Lot U","al":["lot u","u","parking lot u"]},{"id":"Track","label":"Track","cat":"field","x":725,"y":1342,"name":"Track","al":["track","running track"]},{"id":"BBVB","label":"Basketball & Volleyball Courts","cat":"field","x":880,"y":1390,"name":"Basketball & Volleyball Courts","al":["basketball and volleyball courts","basketball courts","volleyball courts","basketball","volleyball"]},{"id":"Tennis","label":"Tennis Courts","cat":"field","x":840,"y":1460,"name":"Tennis Courts","al":["tennis courts","tennis"]},{"id":"Softball","label":"Softball Field","cat":"field","x":942,"y":1452,"name":"Softball Field","al":["softball field","softball"]},{"id":"Multi","label":"Multipurpose Field","cat":"field","x":843,"y":1565,"name":"Multipurpose Field","al":["multipurpose field","multipurpose","multi purpose field"]},{"id":"Baseball","label":"Baseball Fields","cat":"field","x":962,"y":1585,"name":"Baseball Fields","al":["baseball fields","baseball field","baseball"]},{"id":"Cricket","label":"Cricket Field","cat":"field","x":888,"y":1800,"name":"Cricket Field","al":["cricket field","cricket"]},{"id":"Soccer3","label":"Soccer Field 3","cat":"field","x":542,"y":1414,"name":"Soccer Field 3","al":["soccer field 3","soccer 3","field 3","sf3","sf 3","3"]},{"id":"Soccer2","label":"Soccer Field 2","cat":"field","x":635,"y":1414,"name":"Soccer Field 2","al":["soccer field 2","soccer 2","field 2","sf2","sf 2","2"]},{"id":"Soccer1","label":"Soccer Field 1","cat":"field","x":727,"y":1414,"name":"Soccer Field 1","al":["soccer field 1","soccer 1","field 1","sf1","sf 1","1"]},{"id":"Soccer6","label":"Soccer Field 6","cat":"field","x":526,"y":1546,"name":"Soccer Field 6","al":["soccer field 6","soccer 6","field 6","sf6","sf 6","6"]},{"id":"Soccer5","label":"Soccer Field 5","cat":"field","x":612,"y":1546,"name":"Soccer Field 5","al":["soccer field 5","soccer 5","field 5","sf5","sf 5","5"]},{"id":"Soccer4","label":"Soccer Field 4","cat":"field","x":699,"y":1546,"name":"Soccer Field 4","al":["soccer field 4","soccer 4","field 4","sf4","sf 4","4"]},{"id":"Soccer8","label":"Soccer Field 8","cat":"field","x":562,"y":1700,"name":"Soccer Field 8","al":["soccer field 8","soccer 8","field 8","sf8","sf 8","8"]},{"id":"Soccer7","label":"Soccer Field 7","cat":"field","x":649,"y":1700,"name":"Soccer Field 7","al":["soccer field 7","soccer 7","field 7","sf7","sf 7","7"]},{"id":"Soccer10","label":"Soccer Field 10","cat":"field","x":570,"y":1810,"name":"Soccer Field 10","al":["soccer field 10","soccer 10","field 10","sf10","sf 10","10"]},{"id":"Soccer9","label":"Soccer Field 9","cat":"field","x":655,"y":1810,"name":"Soccer Field 9","al":["soccer field 9","soccer 9","field 9","sf9","sf 9","9"]},{"id":"B3","label":"Building 3","cat":"apt","x":362,"y":1200,"name":"University Village Building 3 (Phase 1)","al":["building 3","bldg 3","3","b3","uv 3"],"ph":"1"},{"id":"B2","label":"Building 2","cat":"apt","x":453,"y":1186,"name":"University Village Building 2 (Phase 1)","al":["building 2","bldg 2","2","b2","uv 2"],"ph":"1"},{"id":"B4","label":"Building 4","cat":"apt","x":407,"y":1232,"name":"University Village Building 4 (Phase 1)","al":["building 4","bldg 4","4","b4","uv 4"],"ph":"1"},{"id":"B12","label":"Building 12","cat":"apt","x":463,"y":1228,"name":"University Village Building 12 (Phase 1)","al":["building 12","bldg 12","12","b12","uv 12"],"ph":"1"},{"id":"B5","label":"Building 5","cat":"apt","x":348,"y":1245,"name":"University Village Building 5 (Phase 1)","al":["building 5","bldg 5","5","b5","uv 5"],"ph":"1"},{"id":"B7","label":"Building 7","cat":"apt","x":322,"y":1278,"name":"University Village Building 7 (Phase 1)","al":["building 7","bldg 7","7","b7","uv 7"],"ph":"1"},{"id":"B6","label":"Building 6","cat":"apt","x":402,"y":1272,"name":"University Village Building 6 (Phase 1)","al":["building 6","bldg 6","6","b6","uv 6"],"ph":"1"},{"id":"B9","label":"Building 9","cat":"apt","x":391,"y":1308,"name":"University Village Building 9 (Phase 1)","al":["building 9","bldg 9","9","b9","uv 9"],"ph":"1"},{"id":"B11","label":"Building 11","cat":"apt","x":444,"y":1293,"name":"University Village Building 11 (Phase 1)","al":["building 11","bldg 11","11","b11","uv 11"],"ph":"1"},{"id":"B10","label":"Building 10","cat":"apt","x":442,"y":1322,"name":"University Village Building 10 (Phase 1)","al":["building 10","bldg 10","10","b10","uv 10"],"ph":"1"},{"id":"B8","label":"Building 8","cat":"apt","x":295,"y":1330,"name":"University Village Building 8 (Phase 1)","al":["building 8","bldg 8","8","b8","uv 8"],"ph":"1"},{"id":"B15","label":"Building 15","cat":"apt","x":291,"y":1413,"name":"University Village Building 15 (Phase 2)","al":["building 15","bldg 15","15","b15","uv 15"],"ph":"2"},{"id":"B14","label":"Building 14","cat":"apt","x":298,"y":1435,"name":"University Village Building 14 (Phase 2)","al":["building 14","bldg 14","14","b14","uv 14"],"ph":"2"},{"id":"B16","label":"Building 16","cat":"apt","x":342,"y":1430,"name":"University Village Building 16 (Phase 2)","al":["building 16","bldg 16","16","b16","uv 16"],"ph":"2"},{"id":"B17","label":"Building 17","cat":"apt","x":388,"y":1430,"name":"University Village Building 17 (Phase 2)","al":["building 17","bldg 17","17","b17","uv 17"],"ph":"2"},{"id":"B18","label":"Building 18","cat":"apt","x":415,"y":1415,"name":"University Village Building 18 (Phase 2)","al":["building 18","bldg 18","18","b18","uv 18"],"ph":"2"},{"id":"B19","label":"Building 19","cat":"apt","x":386,"y":1462,"name":"University Village Building 19 (Phase 2)","al":["building 19","bldg 19","19","b19","uv 19"],"ph":"2"},{"id":"B23","label":"Building 23","cat":"apt","x":297,"y":1505,"name":"University Village Building 23 (Phase 2)","al":["building 23","bldg 23","23","b23","uv 23"],"ph":"2"},{"id":"B22","label":"Building 22","cat":"apt","x":322,"y":1527,"name":"University Village Building 22 (Phase 2)","al":["building 22","bldg 22","22","b22","uv 22"],"ph":"2"},{"id":"B21","label":"Building 21","cat":"apt","x":365,"y":1523,"name":"University Village Building 21 (Phase 2)","al":["building 21","bldg 21","21","b21","uv 21"],"ph":"2"},{"id":"B20","label":"Building 20","cat":"apt","x":408,"y":1522,"name":"University Village Building 20 (Phase 2)","al":["building 20","bldg 20","20","b20","uv 20"],"ph":"2"},{"id":"B24","label":"Building 24","cat":"apt","x":583,"y":1191,"name":"University Village Building 24 (Phase 3)","al":["building 24","bldg 24","24","b24","uv 24"],"ph":"3"},{"id":"B25","label":"Building 25","cat":"apt","x":649,"y":1191,"name":"University Village Building 25 (Phase 3)","al":["building 25","bldg 25","25","b25","uv 25"],"ph":"3"},{"id":"B26","label":"Building 26","cat":"apt","x":696,"y":1210,"name":"University Village Building 26 (Phase 3)","al":["building 26","bldg 26","26","b26","uv 26"],"ph":"3"},{"id":"B31","label":"Building 31","cat":"apt","x":563,"y":1235,"name":"University Village Building 31 (Phase 3)","al":["building 31","bldg 31","31","b31","uv 31"],"ph":"3"},{"id":"B27","label":"Building 27","cat":"apt","x":691,"y":1237,"name":"University Village Building 27 (Phase 3)","al":["building 27","bldg 27","27","b27","uv 27"],"ph":"3"},{"id":"B30","label":"Building 30","cat":"apt","x":589,"y":1260,"name":"University Village Building 30 (Phase 3)","al":["building 30","bldg 30","30","b30","uv 30"],"ph":"3"},{"id":"B29","label":"Building 29","cat":"apt","x":648,"y":1265,"name":"University Village Building 29 (Phase 3)","al":["building 29","bldg 29","29","b29","uv 29"],"ph":"3"},{"id":"B28","label":"Building 28","cat":"apt","x":697,"y":1265,"name":"University Village Building 28 (Phase 3)","al":["building 28","bldg 28","28","b28","uv 28"],"ph":"3"},{"id":"B35","label":"Building 35","cat":"apt","x":323,"y":1018,"name":"University Village Building 35 (Phase 4)","al":["building 35","bldg 35","35","b35","uv 35"],"ph":"4"},{"id":"B36","label":"Building 36","cat":"apt","x":378,"y":1040,"name":"University Village Building 36 (Phase 4)","al":["building 36","bldg 36","36","b36","uv 36"],"ph":"4"},{"id":"B34","label":"Building 34","cat":"apt","x":332,"y":1045,"name":"University Village Building 34 (Phase 4)","al":["building 34","bldg 34","34","b34","uv 34"],"ph":"4"},{"id":"B33","label":"Building 33","cat":"apt","x":348,"y":1097,"name":"University Village Building 33 (Phase 4)","al":["building 33","bldg 33","33","b33","uv 33"],"ph":"4"},{"id":"B41","label":"Building 41","cat":"apt","x":489,"y":1020,"name":"University Village Building 41 (Phase 5)","al":["building 41","bldg 41","41","b41","uv 41"],"ph":"5"},{"id":"B40","label":"Building 40","cat":"apt","x":475,"y":1045,"name":"University Village Building 40 (Phase 5)","al":["building 40","bldg 40","40","b40","uv 40"],"ph":"5"},{"id":"B38","label":"Building 38","cat":"apt","x":424,"y":1095,"name":"University Village Building 38 (Phase 5)","al":["building 38","bldg 38","38","b38","uv 38"],"ph":"5"},{"id":"B39","label":"Building 39","cat":"apt","x":457,"y":1097,"name":"University Village Building 39 (Phase 5)","al":["building 39","bldg 39","39","b39","uv 39"],"ph":"5"},{"id":"B45","label":"Building 45","cat":"apt","x":425,"y":883,"name":"University Village Building 45 (Phase 6)","al":["building 45","bldg 45","45","b45","uv 45"],"ph":"6"},{"id":"B46","label":"Building 46","cat":"apt","x":476,"y":887,"name":"University Village Building 46 (Phase 6)","al":["building 46","bldg 46","46","b46","uv 46"],"ph":"6"},{"id":"B44","label":"Building 44","cat":"apt","x":425,"y":960,"name":"University Village Building 44 (Phase 6)","al":["building 44","bldg 44","44","b44","uv 44"],"ph":"6"},{"id":"B43","label":"Building 43","cat":"apt","x":485,"y":958,"name":"University Village Building 43 (Phase 6)","al":["building 43","bldg 43","43","b43","uv 43"],"ph":"6"},{"id":"B50","label":"Building 50","cat":"apt","x":331,"y":880,"name":"University Village Building 50 (Phase 7)","al":["building 50","bldg 50","50","b50","uv 50"],"ph":"7"},{"id":"B51","label":"Building 51","cat":"apt","x":365,"y":880,"name":"University Village Building 51 (Phase 7)","al":["building 51","bldg 51","51","b51","uv 51"],"ph":"7"},{"id":"B49","label":"Building 49","cat":"apt","x":326,"y":958,"name":"University Village Building 49 (Phase 7)","al":["building 49","bldg 49","49","b49","uv 49"],"ph":"7"},{"id":"B48","label":"Building 48","cat":"apt","x":364,"y":960,"name":"University Village Building 48 (Phase 7)","al":["building 48","bldg 48","48","b48","uv 48"],"ph":"7"},{"id":"B54","label":"Building 54","cat":"apt","x":515,"y":740,"name":"University Village Building 54 (Phase 8)","al":["building 54","bldg 54","54","b54","uv 54"],"ph":"8"},{"id":"B55","label":"Building 55","cat":"apt","x":562,"y":729,"name":"University Village Building 55 (Phase 8)","al":["building 55","bldg 55","55","b55","uv 55"],"ph":"8"},{"id":"B56","label":"Building 56","cat":"apt","x":611,"y":724,"name":"University Village Building 56 (Phase 8)","al":["building 56","bldg 56","56","b56","uv 56"],"ph":"8"},{"id":"B57","label":"Building 57","cat":"apt","x":651,"y":739,"name":"University Village Building 57 (Phase 8)","al":["building 57","bldg 57","57","b57","uv 57"],"ph":"8"},{"id":"B53","label":"Building 53","cat":"apt","x":502,"y":787,"name":"University Village Building 53 (Phase 8)","al":["building 53","bldg 53","53","b53","uv 53"],"ph":"8"},{"id":"B59","label":"Building 59","cat":"apt","x":604,"y":792,"name":"University Village Building 59 (Phase 8)","al":["building 59","bldg 59","59","b59","uv 59"],"ph":"8"},{"id":"B58","label":"Building 58","cat":"apt","x":650,"y":787,"name":"University Village Building 58 (Phase 8)","al":["building 58","bldg 58","58","b58","uv 58"],"ph":"8"},{"id":"B62","label":"Building 62","cat":"apt","x":325,"y":717,"name":"University Village Building 62 (Phase 8A)","al":["building 62","bldg 62","62","b62","uv 62"],"ph":"8A"},{"id":"B63","label":"Building 63","cat":"apt","x":368,"y":708,"name":"University Village Building 63 (Phase 8A)","al":["building 63","bldg 63","63","b63","uv 63"],"ph":"8A"},{"id":"B61","label":"Building 61","cat":"apt","x":325,"y":776,"name":"University Village Building 61 (Phase 8A)","al":["building 61","bldg 61","61","b61","uv 61"],"ph":"8A"},{"id":"B67","label":"Building 67","cat":"apt","x":703,"y":739,"name":"University Village Building 67 (Phase 9)","al":["building 67","bldg 67","67","b67","uv 67"],"ph":"9"},{"id":"B66","label":"Building 66","cat":"apt","x":700,"y":808,"name":"University Village Building 66 (Phase 9)","al":["building 66","bldg 66","66","b66","uv 66"],"ph":"9"},{"id":"B65","label":"Building 65","cat":"apt","x":687,"y":863,"name":"University Village Building 65 (Phase 9)","al":["building 65","bldg 65","65","b65","uv 65"],"ph":"9"},{"id":"Ph1","label":"Phase 1","cat":"phase","x":390,"y":1262,"name":"University Village Phase 1","al":["phase 1","ph 1","p1","uv phase 1","university village phase 1","1"],"ph":"1"},{"id":"Ph2","label":"Phase 2","cat":"phase","x":360,"y":1468,"name":"University Village Phase 2","al":["phase 2","ph 2","p2","uv phase 2","university village phase 2","2"],"ph":"2"},{"id":"Ph3","label":"Phase 3","cat":"phase","x":632,"y":1232,"name":"University Village Phase 3","al":["phase 3","ph 3","p3","uv phase 3","university village phase 3","3"],"ph":"3"},{"id":"Ph4","label":"Phase 4","cat":"phase","x":360,"y":1050,"name":"University Village Phase 4","al":["phase 4","ph 4","p4","uv phase 4","university village phase 4","4"],"ph":"4"},{"id":"Ph5","label":"Phase 5","cat":"phase","x":455,"y":1062,"name":"University Village Phase 5","al":["phase 5","ph 5","p5","uv phase 5","university village phase 5","5"],"ph":"5"},{"id":"Ph6","label":"Phase 6","cat":"phase","x":452,"y":922,"name":"University Village Phase 6","al":["phase 6","ph 6","p6","uv phase 6","university village phase 6","6"],"ph":"6"},{"id":"Ph7","label":"Phase 7","cat":"phase","x":346,"y":918,"name":"University Village Phase 7","al":["phase 7","ph 7","p7","uv phase 7","university village phase 7","7"],"ph":"7"},{"id":"Ph8","label":"Phase 8","cat":"phase","x":582,"y":762,"name":"University Village Phase 8","al":["phase 8","ph 8","p8","uv phase 8","university village phase 8","8"],"ph":"8"},{"id":"Ph8A","label":"Phase 8A","cat":"phase","x":345,"y":748,"name":"University Village Phase 8A","al":["phase 8A","ph 8A","p8A","uv phase 8A","university village phase 8A","8A"],"ph":"8A"},{"id":"Ph9","label":"Phase 9","cat":"phase","x":702,"y":800,"name":"University Village Phase 9","al":["phase 9","ph 9","p9","uv phase 9","university village phase 9","9"],"ph":"9"}];
+const MAPW=1545, MAPH=2000;
+const FT_PER_PX = 3.3; // ~1 m per map pixel (soccer field ≈ 110 px); approximate
+
+/* ---------- scoring ---------- */
+const CATS = {
+  acad: {name:"Academic buildings", pts:10},
+  res:  {name:"Residence halls & housing", pts:10},
+  ps:   {name:"Parking structures", pts:15},
+  lot:  {name:"Parking lots", pts:15},
+  phase:{name:"Apartment phases", pts:15},
+  field:{name:"Athletics & fields", pts:20},
+  apt:  {name:"Apartment buildings (phases)", pts:25},
+};
+const DIFFS = {
+  easy:  {name:"Easy",   desc:"Buildings + apartment phases", cats:["acad","res","phase"], mult:1,   pinDest:true},
+  medium:{name:"Medium", desc:"Buildings, phases + parking",  cats:["acad","res","phase","ps","lot"], mult:1.5, pinDest:false},
+  hard:  {name:"Hard",   desc:"Everything, incl. building #s", cats:["acad","res","phase","ps","lot","field","apt"], mult:2, pinDest:false},
+};
+const MODES = {
+  name:{name:"Name It", desc:"A spot lights up. Type what it is."},
+  find:{name:"Find It", desc:"We name it. Tap it on the map."},
+  shift:{name:"Full Shift", desc:"A mix of Name It and Find It."},
+};
+const ROUTE_BASE = 50, FIND_FACTOR = 0.8, SHIFT_LEN = 10;
+
+/* ---------- road network (map pixel coords) ---------- */
+const P = {
+ W1:[278,160],W2:[278,322],W4:[278,578],W5:[278,822],W6:[278,990],W8:[278,1140],W9:[262,1300],W10:[215,1450],W11:[205,1630],W12:[250,1790],W13:[330,1960],
+ S3:[592,322],U1:[775,322],S5:[1090,322],NF1:[1290,328],
+ L0:[520,578],L5:[668,578],L1:[775,578],L2:[893,585],L3:[1090,548],DG1:[1245,870],
+ V1:[893,760],V2:[773,760],V3:[773,815],V4:[773,1140],V5:[760,1140],V6:[1145,1140],DG2:[1237,1140],
+ P1:[395,822],P2:[515,822],P3:[668,815],P4:[395,990],P5:[515,990],P6:[515,1140],
+ M0:[1028,955],M2:[1028,1140],RBN:[1028,1250],RBE:[1058,1278],RBS:[1028,1305],RBW:[998,1278],
+ AR0:[1310,1282],MN:[1220,1285],V7:[760,1308],SW2:[512,1308],SW1:[473,1310],SW3:[473,1630],FS1:[760,1630],FS2:[800,1630],
+ UP2:[1040,1810],UC:[1040,1960],NFC:[1365,1960],NF4:[1462,790],
+};
+const ROADS = [
+ ["Waterview Pkwy",["W1","W2",[278,440],"W4","W5","W6",[278,1075],"W8","W9","W10",[200,1530],"W11","W12","W13"]],
+ ["Stewart Dr",["W1",[560,160],[592,200],"S3"]],
+ ["Synergy Park Blvd",["W2","S3","U1","S5","NF1"]],
+ ["University Pkwy (north)",["U1","L1"]],
+ ["Loop Rd NW",["W4","L0","L5","L1"]],
+ ["Loop Rd",["L1","L2",[960,590],[1010,560],"L3",[1150,560],[1195,610],[1230,690],[1250,780],"DG1"]],
+ ["Loop Rd (north access)",["S5","L3"]],
+ ["Service road",["L2","V1","V2"]],
+ ["Service road",["L1","V2","V3","V4"]],
+ ["Frank Johnson Dr",["W5","P1","P2","P3","V3"]],
+ ["Phase 8/9 drive",["L5","P3"]],
+ ["Phase 6/7 drive",["P1","P4"]],
+ ["Phase 4/6 drive",["W6","P4","P5"]],
+ ["Lot H drive",["P2","P5","P6"]],
+ ["Franklyn Jenifer Dr",["W8",[400,1140],"P6","V5","V4"]],
+ ["Service road",["V4",[900,1140],[1000,1140],"M2","V6","DG2"]],
+ ["Service road",["V6",[1145,1050]]],
+ ["Mall (fire lane)",["M0","M2","RBN"]],
+ ["Drive G",["DG1","DG2"]],
+ ["Bryce Jordan Dr",["DG1",[1330,830],[1400,800],"NF4"]],
+ ["Loop Rd",["DG1",[1300,920],[1330,1000],[1345,1100],[1345,1220],"AR0"]],
+ ["Loop Rd",["AR0","MN",[1100,1285],"RBE"]],
+ ["Roundabout",["RBN","RBE","RBS","RBW","RBN"]],
+ ["Loop Rd",["RBW",[900,1298],[800,1305],"V7"]],
+ ["Phase 3 drive",["V5",[760,1230],"V7"]],
+ ["Loop Rd SW",["V7",[600,1308],"SW2","SW1"]],
+ ["Phase 1/3 drive",["P6",[512,1230],"SW2"]],
+ ["Loop Rd SW",["SW1",[473,1380],[473,1450],[473,1545],"SW3"]],
+ ["Phase 2 drive",[[473,1380],[280,1380],[270,1545],[473,1545]]],
+ ["Lot W drive",[[278,440],[200,465],[110,465]]],
+ ["Lot V drive",[[278,1075],[160,1075]]],
+ ["Facilities drive",[[1150,560],[1230,455]]],
+ ["Lot R drive",[[1010,560],[1048,635]]],
+ ["Loop Rd SW",["SW3",[330,1630],"W11"]],
+ ["Field St",["SW3","FS1","FS2"]],
+ ["University Pkwy",["RBS",[1037,1400],"UP2","UC"]],
+ ["W. Campbell Rd",["W13","UC","NFC",[1545,1960]]],
+ ["Armstrong Dr",["AR0",[1290,1330],[1250,1440],[1180,1560],[1110,1680],"UP2"]],
+ ["N. Floyd Rd",["NF1",[1420,470],[1468,600],"NF4",[1445,950],[1420,1100],[1385,1300],[1345,1450],[1325,1600],[1330,1750],"NFC"]],
+];
+const nodes=[], nodeKey=new Map(), edges=[], adj=[];
+function nodeId(pt){const k=pt[0]+","+pt[1]; if(!nodeKey.has(k)){nodeKey.set(k,nodes.length);nodes.push(pt);adj.push([]);} return nodeKey.get(k);}
+for(const [nm,seq] of ROADS){
+  const ids=seq.map(p=>nodeId(typeof p==="string"?P[p]:p));
+  for(let i=0;i<ids.length-1;i++){const a=ids[i],b=ids[i+1];const len=dist(nodes[a],nodes[b]);const e=edges.length;edges.push({a,b,len,name:nm});adj[a].push([b,len,e]);adj[b].push([a,len,e]);}
+}
+function dist(p,q){return Math.hypot(p[0]-q[0],p[1]-q[1]);}
+function projSeg(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1];const L2=dx*dx+dy*dy;let t=L2?((p[0]-a[0])*dx+(p[1]-a[1])*dy)/L2:0;t=Math.max(0,Math.min(1,t));const q=[a[0]+t*dx,a[1]+t*dy];return {t,q,d:dist(p,q)};}
+function nearestEdge(p){let best=null;edges.forEach((e,i)=>{const r=projSeg(p,nodes[e.a],nodes[e.b]);if(!best||r.d<best.d)best={...r,e:i};});return best;}
+const ACCESS=new Map(); LOCS.forEach(l=>ACCESS.set(l.id,nearestEdge([l.x,l.y])));
+function shortest(A,B){
+  // returns {len, pts}
+  const pa=[A.x,A.y], pb=[B.x,B.y], ea=ACCESS.get(A.id), eb=ACCESS.get(B.id);
+  const EA=edges[ea.e], EB=edges[eb.e];
+  const n=nodes.length, S=n, T=n+1, d=new Array(n+2).fill(Infinity), prev=new Array(n+2).fill(-1), done=new Array(n+2).fill(false);
+  const extra=(u)=>{ // virtual edges
+    const out=[];
+    if(u===S){out.push([EA.a,EA.len*ea.t]);out.push([EA.b,EA.len*(1-ea.t)]);
+      if(ea.e===eb.e) out.push([T,Math.abs(ea.t-eb.t)*EA.len]);}
+    if(u===EB.a) out.push([T,EB.len*eb.t]);
+    if(u===EB.b) out.push([T,EB.len*(1-eb.t)]);
+    return out;};
+  d[S]=0;
+  for(;;){let u=-1,bd=Infinity;for(let i=0;i<n+2;i++) if(!done[i]&&d[i]<bd){bd=d[i];u=i;} if(u<0||u===T)break; done[u]=true;
+    const nb=(u<n?adj[u].map(x=>[x[0],x[1]]):[]).concat(extra(u));
+    for(const [v,w] of nb){ if(d[u]+w<d[v]){d[v]=d[u]+w;prev[v]=u;} } }
+  const chain=[];let c=T;while(c!==-1){chain.push(c);c=prev[c];} chain.reverse();
+  const pts=[pa,ea.q];
+  for(const c of chain){ if(c<n) pts.push(nodes[c]); }
+  pts.push(eb.q,pb);
+  return {len:d[T]+ea.d+eb.d, pts};
+}
+function polyLen(pts){let s=0;for(let i=1;i<pts.length;i++)s+=dist(pts[i-1],pts[i]);return s;}
+function distToRoads(p){let m=Infinity;for(const e of edges){const r=projSeg(p,nodes[e.a],nodes[e.b]);if(r.d<m)m=r.d;}return m;}
+function distToPoly(p,pts){let m=Infinity;for(let i=1;i<pts.length;i++){const r=projSeg(p,pts[i-1],pts[i]);if(r.d<m)m=r.d;}return m;}
+
+/* ---------- answers ---------- */
+const norm=s=>s.toLowerCase().replace(/&/g,"and").replace(/^the\s+/,"").replace(/[^a-z0-9]/g,"");
+function answersFor(l){const a=new Set([l.label,l.id,...(l.al||[])].map(norm)); if(l.name) l.name.split(" / ").forEach(n=>a.add(norm(n))); a.delete(""); return [...a];}
+function lev(a,b){const m=a.length,n=b.length;const d=Array.from({length:m+1},(_,i)=>[i,...new Array(n).fill(0)]);for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n];}
+function isCorrect(input,l){const x=norm(input); if(!x) return false; const group=LOCS.filter(o=>(o.g||o.id)===(l.g||l.id));
+  for(const o of group) for(const a of answersFor(o)){ if(a===x) return true; if(a.length>=5 && lev(a,x)<=(a.length>=10?2:1) && !/^\d+$/.test(a)) return true; }
+  return false;}
+const gkey=l=>l.g||l.id;
+
+/* ---------- state ---------- */
+const store={get(k,d){try{const v=localStorage.getItem("utdrun:"+k);return v?JSON.parse(v):d;}catch(e){return d;}},set(k,v){try{localStorage.setItem("utdrun:"+k,JSON.stringify(v));}catch(e){}}};
+let S = { screen:"home", diff:store.get("diff","easy"), mode:(m=>MODES[m]?m:"shift")(store.get("mode","shift")), lbTab:store.get("diff","easy") };
+let G = null; // active shift
+const rail=document.getElementById("rail");
+const el=(h)=>{const t=document.createElement("template");t.innerHTML=h.trim();return t.content.firstElementChild;};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=n=>Math.round(n).toLocaleString();
+const ICON=`<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="var(--ems-ink)" d="M10 2h4v6.5l5.6-3.3 2 3.5L16 12l5.6 3.3-2 3.5L14 15.5V22h-4v-6.5l-5.6 3.3-2-3.5L8 12 2.4 8.7l2-3.5L10 8.5z"/></svg>`;
+
+/* ---------- map view ---------- */
+const vp=document.getElementById("viewport"), stage=document.getElementById("stage"), svg=document.getElementById("overlay"), mapimg=document.getElementById("mapimg");
+let V={s:0.3,tx:0,ty:0};
+function fitScale(){return Math.min(vp.clientWidth/MAPW, vp.clientHeight/MAPH);}
+function applyV(){stage.style.transform=`translate(${V.tx}px,${V.ty}px) scale(${V.s})`;}
+function clampV(){const w=vp.clientWidth,h=vp.clientHeight,sw=MAPW*V.s,sh=MAPH*V.s;
+  V.tx = sw<=w ? (w-sw)/2 : Math.min(0,Math.max(w-sw,V.tx));
+  V.ty = sh<=h ? (h-sh)/2 : Math.min(0,Math.max(h-sh,V.ty));}
+function fit(){V.s=fitScale();clampV();applyV();}
+function zoomAt(f,sx,sy){const ns=Math.max(fitScale()*0.95,Math.min(3,V.s*f));const mx=(sx-V.tx)/V.s,my=(sy-V.ty)/V.s;V.s=ns;V.tx=sx-mx*ns;V.ty=sy-my*ns;clampV();applyV();}
+function focusOn(x,y,s){V.s=Math.max(fitScale(),s);V.tx=vp.clientWidth/2-x*V.s;V.ty=vp.clientHeight/2-y*V.s;clampV();applyV();}
+function focusBox(pts,pad=120){let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const p of pts){x0=Math.min(x0,p[0]);y0=Math.min(y0,p[1]);x1=Math.max(x1,p[0]);y1=Math.max(y1,p[1]);}
+  x0-=pad;y0-=pad;x1+=pad;y1+=pad;const s=Math.min(vp.clientWidth/(x1-x0),vp.clientHeight/(y1-y0),1.4);focusOn((x0+x1)/2,(y0+y1)/2,s);}
+document.getElementById("zin").onclick=()=>zoomAt(1.4,vp.clientWidth/2,vp.clientHeight/2);
+document.getElementById("zout").onclick=()=>zoomAt(1/1.4,vp.clientWidth/2,vp.clientHeight/2);
+document.getElementById("zfit").onclick=fit;
+const panbtn=document.getElementById("panbtn");
+let panMode=false; panbtn.onclick=()=>{panMode=!panMode;panbtn.setAttribute("aria-pressed",panMode);updateCursor();};
+function updateCursor(){vp.classList.toggle("drawing", isDrawQ() && !panMode);}
+vp.addEventListener("wheel",e=>{e.preventDefault();const r=vp.getBoundingClientRect();zoomAt(Math.exp(-e.deltaY*0.0015),e.clientX-r.left,e.clientY-r.top);},{passive:false});
+new ResizeObserver(()=>{clampV();applyV();}).observe(vp);
+
+const ptrs=new Map(); let gesture=null;
+function toMap(cx,cy){const r=vp.getBoundingClientRect();return [(cx-r.left-V.tx)/V.s,(cy-r.top-V.ty)/V.s];}
+vp.addEventListener("pointerdown",e=>{
+  vp.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2){ if(gesture&&gesture.type==="draw") endDrawStroke(false); const [a,b]=[...ptrs.values()];
+    gesture={type:"pinch",d0:Math.hypot(a.x-b.x,a.y-b.y),s0:V.s,mid:[(a.x+b.x)/2,(a.y+b.y)/2],tx0:V.tx,ty0:V.ty}; return; }
+  const m=toMap(e.clientX,e.clientY);
+  if(isDrawQ() && !panMode && e.button!==2 && beginDraw(m)){ gesture={type:"draw"}; return; }
+  gesture={type:"pan",x0:e.clientX,y0:e.clientY,tx0:V.tx,ty0:V.ty,t0:performance.now(),moved:false};
+});
+vp.addEventListener("pointermove",e=>{
+  if(!ptrs.has(e.pointerId))return; ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(!gesture)return;
+  if(gesture.type==="pinch"&&ptrs.size>=2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);const r=vp.getBoundingClientRect();
+    const ns=Math.max(fitScale()*0.95,Math.min(3,gesture.s0*d/gesture.d0));const mid=[(a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top];const m0=[(gesture.mid[0]-r.left-gesture.tx0)/gesture.s0,(gesture.mid[1]-r.top-gesture.ty0)/gesture.s0];
+    V.s=ns;V.tx=mid[0]-m0[0]*ns;V.ty=mid[1]-m0[1]*ns;clampV();applyV();}
+  else if(gesture.type==="pan"){const dx=e.clientX-gesture.x0,dy=e.clientY-gesture.y0;if(Math.hypot(dx,dy)>6)gesture.moved=true;V.tx=gesture.tx0+dx;V.ty=gesture.ty0+dy;clampV();applyV();}
+  else if(gesture.type==="draw"){extendDraw(toMap(e.clientX,e.clientY));}
+});
+function ptrEnd(e){ if(!ptrs.has(e.pointerId))return; ptrs.delete(e.pointerId);
+  if(gesture&&gesture.type==="draw"){endDrawStroke(true);gesture=null;return;}
+  if(gesture&&gesture.type==="pan"&&!gesture.moved&&performance.now()-gesture.t0<600&&e.type==="pointerup"){onMapTap(toMap(e.clientX,e.clientY));}
+  if(ptrs.size===0)gesture=null; else if(gesture&&gesture.type==="pinch"){const [p]=[...ptrs.values()];gesture={type:"pan",x0:p.x,y0:p.y,tx0:V.tx,ty0:V.ty,t0:0,moved:true};}
+}
+vp.addEventListener("pointerup",ptrEnd); vp.addEventListener("pointercancel",ptrEnd);
+vp.addEventListener("contextmenu",e=>e.preventDefault());
+
+/* ---------- SVG helpers ---------- */
+const NS="http://www.w3.org/2000/svg";
+function svgEl(tag,attrs,parent=svg){const n=document.createElementNS(NS,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);parent.appendChild(n);return n;}
+function clearOverlay(){svg.replaceChildren();}
+const ptsAttr=pts=>pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+function ring(l,color,pulse=true){const g=svgEl("g",{});
+  if(pulse) svgEl("circle",{cx:l.x,cy:l.y,r:14,fill:"none",stroke:color,"stroke-width":5,class:"pulse"},g);
+  const rr=l.cat==="apt"?17:l.cat==="phase"?72:24;
+  svgEl("circle",{cx:l.x,cy:l.y,r:rr,fill:"none",stroke:color,"stroke-width":6},g);
+  svgEl("circle",{cx:l.x,cy:l.y,r:rr,fill:"none",stroke:"#fff","stroke-width":2,"stroke-dasharray":"6 6"},g); return g;}
+function pin(l,color,text){const g=svgEl("g",{transform:`translate(${l.x},${l.y})`});
+  svgEl("path",{d:"M0 0 C -6 -14 -20 -22 -20 -36 A 20 20 0 1 1 20 -36 C 20 -22 6 -14 0 0Z",fill:color,stroke:"#fff","stroke-width":3},g);
+  const t=svgEl("text",{x:0,y:-29,"text-anchor":"middle","font-family":"Barlow Condensed, Arial Narrow, sans-serif","font-weight":800,"font-size":22,fill:"#fff"},g);t.textContent=text;return g;}
+function label(x,y,text,color){const g=svgEl("g",{});const t=svgEl("text",{x,y,"text-anchor":"middle","font-family":"Barlow Condensed, Arial Narrow, sans-serif","font-weight":800,"font-size":26,fill:color,stroke:"#fff","stroke-width":6,"paint-order":"stroke"},g);t.textContent=text;return g;}
+
+/* ---------- question generation ---------- */
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function pickLoc(diff,used){const cats=DIFFS[diff].cats;for(let k=0;k<200;k++){const c=cats[Math.floor(Math.random()*cats.length)];const pool=LOCS.filter(l=>l.cat===c&&!used.has(gkey(l)));if(pool.length){const l=pool[Math.floor(Math.random()*pool.length)];used.add(gkey(l));return l;}}return LOCS[0];}
+function buildShift(diff,mode){const used=new Set();const qs=[];
+  let kinds; if(mode==="shift") kinds=shuffle(["name","name","name","name","name","find","find","find","find","find"]); else kinds=new Array(SHIFT_LEN).fill(mode);
+  for(const k of kinds){
+    if(k==="route"){let a,b,sp;for(let t=0;t<60;t++){a=pickLoc(diff,new Set(used));b=pickLoc(diff,new Set(used));if(gkey(a)===gkey(b))continue;sp=shortest(a,b);if(sp.len>320&&sp.len<1500)break;}
+      used.add(gkey(b)); qs.push({kind:"route",from:a,to:b,best:sp});}
+    else qs.push({kind:k,loc:pickLoc(diff,used)});
+  }
+  return qs;}
+
+/* ---------- game flow ---------- */
+let tick=null;
+function startShift(){
+  G={diff:S.diff,mode:S.mode,qs:buildShift(S.diff,S.mode),i:0,score:0,streak:0,results:[],t0:0,hint:false,answered:false,path:[],strokes:0};
+  S.screen="play"; document.body.classList.add("playing"); showQ();}
+function q(){return G.qs[G.i];}
+function isDrawQ(){return S.screen==="play"&&G&&q()&&q().kind==="route"&&!G.answered;}
+function elapsed(){return (performance.now()-G.t0)/1000;}
+function catPts(l){return Math.round(CATS[l.cat].pts*DIFFS[G.diff].mult);}
+const extra=l=>(l.name&&!l.label.includes(l.name.split(' / ')[0])&&l.name!==l.label)?' · '+esc(l.name):'';
+
+function showQ(){
+  G.answered=false;G.hint=false;G.path=[];G.t0=performance.now();
+  const Q=q(); mapimg.src = quizMap(); clearOverlay();
+  panbtn.hidden = Q.kind!=="route"; panMode=false; panbtn.setAttribute("aria-pressed","false"); updateCursor();
+  if(Q.kind==="name"){ ring(Q.loc,"#D2381F"); focusOn(Q.loc.x,Q.loc.y,Math.min(0.9,Math.max(fitScale()*2.2,0.5))); setTag("Name the highlighted location"); }
+  else if(Q.kind==="find"){ fit(); setTag("Tap the location on the map"); }
+  else { pin(Q.from,"#1F5FD1","A"); if(DIFFS[G.diff].pinDest) pin(Q.to,"#D2381F","B");
+    G.liveLine=svgEl("polyline",{points:"",fill:"none",stroke:"#1F5FD1","stroke-width":9,"stroke-linecap":"round","stroke-linejoin":"round",opacity:.85});
+    fit(); setTag(DIFFS[G.diff].pinDest?"Drag from A along the roads to B":"Drag from A along the roads to the destination"); }
+  renderPlay(); clearInterval(tick); tick=setInterval(()=>{const t=document.getElementById("clock");if(t&&!G.answered)t.textContent=elapsed().toFixed(1)+"s";},100);
+}
+function quizMap(){return G&&G.diff!=="hard"?"map-blank-em.jpg":"map-blank.jpg";}
+function setTag(t){document.getElementById("maptag").textContent=t;}
+
+function renderPlay(feedback){
+  const Q=q(), D=DIFFS[G.diff];
+  let prompt="",sub="",body="";
+  if(Q.kind==="name"){prompt="What is this location?";sub=`Worth <span class="pts">${fmt(catPts(Q.loc)*(G.hint?0.5:1))}</span> pts`+(Q.loc.cat==="apt"?" · answer with the building number":"");
+    body=G.answered?"":`<form id="nameform" class="row" autocomplete="off"><input type="text" id="answer" placeholder="Code or full name, e.g. SSB" aria-label="Your answer" autocapitalize="characters" spellcheck="false"><div class="row" style="width:100%"><button class="btn primary grow" type="submit">Submit</button><button class="btn small" type="button" id="hintbtn" ${G.hint?"disabled":""}>Hint (½ pts)</button><button class="btn small" type="button" id="skipbtn">Skip</button></div></form>${G.hint?`<p class="sub" style="margin-top:6px">Hint: ${esc(hintText(Q.loc))}</p>`:""}`;}
+  else if(Q.kind==="find"){prompt=`Find: ${esc(Q.loc.label)}`;sub=(extra(Q.loc)?extra(Q.loc).slice(3)+" · ":"")+`<span class="pts">${fmt(catPts(Q.loc)*FIND_FACTOR)}</span> pts`;
+    body=G.answered?"":`<div class="row"><button class="btn small" id="skipbtn">Skip</button></div>`;}
+  else {prompt=`${esc(Q.from.label)} → ${esc(Q.to.label)}`;sub=`Respond from <b>A</b> (${esc(Q.from.name||Q.from.label)}) to ${esc(Q.to.name||Q.to.label)}. Up to <span class="pts">${fmt(ROUTE_BASE*D.mult*1.4)}</span> pts`;
+    body=G.answered?"":`<p class="sub">Press on A and drag along the roads. Lift and continue from the end of your line any time. Use <b>MOVE</b> or two fingers to pan.</p><div class="row" style="margin-top:8px"><button class="btn small" id="clearbtn">Clear line</button><button class="btn small" id="skipbtn">Skip</button></div>`;}
+  rail.replaceChildren(el(`<div style="display:contents">
+    ${brandHTML()}
+    <div class="hud"><div><small>Call</small><b>${G.i+1}/${G.qs.length}</b></div><div><small>Score</small><b>${fmt(G.score)}</b></div><div><small>Time</small><b id="clock">0.0s</b></div></div>
+    <div class="card callcard">
+      <div class="callhead"><span class="eyebrow" style="margin:0">${MODES[Q.kind].name} · ${D.name}</span><span class="callno">STREAK ${G.streak}</span></div>
+      <p class="prompt">${prompt}</p><p class="sub">${sub}</p>
+      <div style="margin-top:10px">${body}</div>
+    </div>
+    <div id="fb"></div>
+    <div class="row"><button class="btn small" id="quitbtn">End shift</button></div>
+  </div>`));
+  if(feedback){document.getElementById("fb").replaceChildren(feedback);}
+  const f=document.getElementById("nameform"); if(f){f.onsubmit=e=>{e.preventDefault();submitName(document.getElementById("answer").value);};const inp=document.getElementById("answer");if(matchMedia("(pointer:fine)").matches)inp.focus();}
+  const hb=document.getElementById("hintbtn"); if(hb) hb.onclick=()=>{G.hint=true;const v=document.getElementById("answer").value;renderPlay();document.getElementById("answer").value=v;};
+  const sb=document.getElementById("skipbtn"); if(sb) sb.onclick=()=>skip();
+  const cb=document.getElementById("clearbtn"); if(cb) cb.onclick=()=>{G.path=[];G.liveLine.setAttribute("points","");};
+  document.getElementById("quitbtn").onclick=()=>finish();
+}
+function hintText(l){ if(l.cat==="phase") return `A University Village apartment phase. Its buildings are numbered ${phaseRange(l.ph)}.`; if(l.cat==="apt") return `It's in Phase ${l.ph} of University Village.`; const n=l.name||l.label; return `${CATS[l.cat].name.replace(/s$/,"")} · starts with “${n[0]}”, ${l.label.length} characters in the code.`;}
+function phaseRange(p){const n=LOCS.filter(o=>o.cat==="apt"&&o.ph===p).map(o=>+o.id.slice(1)).sort((a,b)=>a-b);return n.length?n[0]+"–"+n[n.length-1]:"";}
+function speedBonus(base,secs,window){return Math.round(base*0.5*Math.max(0,1-secs/window));}
+function streakBonus(){return G.streak>=3?Math.min(25,5*(G.streak-2)):0;}
+
+function submitName(v){ if(G.answered||!v.trim())return; const Q=q(),l=Q.loc,secs=elapsed();
+  const ok=isCorrect(v,l); G.answered=true;
+  let pts=0,parts=[];
+  if(ok){G.streak++;const base=Math.round(catPts(l)*(G.hint?0.5:1));const sp=speedBonus(base,secs,20);const st=streakBonus();pts=base+sp+st;parts=[`${fmt(base)} base`,sp?`+${sp} speed`:"",st?`+${st} streak`:""];} else G.streak=0;
+  G.score+=pts; G.results.push({kind:"name",loc:l,ok,pts,given:v,secs});
+  clearOverlay(); ring(l,ok?"#1E8A4C":"#D2381F",false); mapimg.src="map-labeled.jpg";
+  revealFeedback(ok,ok?"Correct":"Not quite",`${esc(l.label)}${extra(l)}${ok?"":` — you answered “${esc(v)}”`}`,pts,parts);
+}
+function onMapTap(m){
+  if(S.screen==="study"){studyTap(m);return;}
+  if(S.screen!=="play"||!G||G.answered||q().kind!=="find")return;
+  const Q=q(),l=Q.loc,secs=elapsed();
+  let near=null,nd=Infinity;for(const o of LOCS){if(o.cat==="phase"&&l.cat!=="phase")continue;if(o.cat!=="phase"&&l.cat==="phase"&&o.cat!=="apt")continue;const d=dist(m,[o.x,o.y]);if(d<nd){nd=d;near=o;}}
+  const direct=LOCS.some(o=>gkey(o)===gkey(l)&&dist(m,[o.x,o.y])<(l.cat==="phase"?60:30));
+  const ok=direct||(near&&nd<70&&(gkey(near)===gkey(l)||(l.cat==="phase"&&near.cat==="apt"&&near.ph===l.ph)));
+  if(near&&near.cat==="apt"&&l.cat==="phase") near={label:"Phase "+near.ph};
+  G.answered=true; let pts=0,parts=[];
+  if(ok){G.streak++;const base=Math.round(catPts(l)*FIND_FACTOR);const sp=speedBonus(base,secs,15);const st=streakBonus();pts=base+sp+st;parts=[`${fmt(base)} base`,sp?`+${sp} speed`:"",st?`+${st} streak`:""];}else G.streak=0;
+  G.score+=pts; G.results.push({kind:"find",loc:l,ok,pts,secs});
+  clearOverlay(); mapimg.src="map-labeled.jpg";
+  LOCS.filter(o=>gkey(o)===gkey(l)).forEach(o=>ring(o,ok?"#1E8A4C":"#D2381F",!ok));
+  svgEl("circle",{cx:m[0],cy:m[1],r:9,fill:ok?"#1E8A4C":"#D2381F",stroke:"#fff","stroke-width":3});
+  if(!ok){const tgt=LOCS.filter(o=>gkey(o)===gkey(l)).sort((a,b)=>dist(m,[a.x,a.y])-dist(m,[b.x,b.y]))[0];focusBox([m,[tgt.x,tgt.y]],160);}
+  revealFeedback(ok,ok?"On target":"Missed",ok?`${esc(l.label)}${extra(l)}`:`${esc(l.label)} is the ring. ${near&&nd<70?`You tapped ${esc(near.label)}.`:"You tapped open ground."}`,pts,parts);
+}
+/* ---- route drawing ---- */
+function beginDraw(m){const Q=q(),tol=Math.max(45,28/V.s);
+  if(G.path.length===0){ if(dist(m,[Q.from.x,Q.from.y])>tol){flashTag("Start your line on A");return false;} G.path=[[Q.from.x,Q.from.y],m]; }
+  else { const end=G.path[G.path.length-1]; if(dist(m,end)>tol){flashTag("Continue from the end of your line");return false;} G.path.push(m); }
+  G.liveLine.setAttribute("points",ptsAttr(G.path)); return true;}
+function extendDraw(m){const last=G.path[G.path.length-1];if(dist(m,last)>3/V.s){G.path.push(m);G.liveLine.setAttribute("points",ptsAttr(G.path));}}
+function endDrawStroke(check){ if(!check||G.answered)return; const Q=q(),end=G.path[G.path.length-1];
+  const targets=LOCS.filter(o=>gkey(o)===gkey(Q.to));
+  if(targets.some(t=>dist(end,[t.x,t.y])<Math.max(45,26/V.s))) gradeRoute(); }
+function flashTag(t){setTag(t);clearTimeout(flashTag.t);flashTag.t=setTimeout(()=>setTag("Drag from A along the roads"),1800);}
+function gradeRoute(){const Q=q(),D=DIFFS[G.diff],secs=elapsed();G.answered=true;
+  const best=Q.best, pl=polyLen(G.path);
+  const samples=[];for(let i=1;i<G.path.length;i++){const a=G.path[i-1],b=G.path[i],n=Math.ceil(dist(a,b)/8);for(let k=0;k<n;k++)samples.push([a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n]);}
+  const spurA=[[Q.from.x,Q.from.y],best.pts[1]], spurB=[best.pts[best.pts.length-2],[Q.to.x,Q.to.y]];
+  let on=0;for(const p of samples){ if(distToRoads(p)<24||distToPoly(p,spurA)<30||distToPoly(p,spurB)<30||dist(p,[Q.from.x,Q.from.y])<50||dist(p,[Q.to.x,Q.to.y])<50) on++; }
+  const onRoad=samples.length?on/samples.length:0;
+  let follow=0;for(const p of samples) if(distToPoly(p,best.pts)<30) follow++; const match=samples.length?follow/samples.length:0;
+  const eff=Math.min(1,best.len/Math.max(pl,1));
+  const acc=Math.max(0,Math.min(1,eff*onRoad));
+  const base=ROUTE_BASE*D.mult*acc;
+  const sp=acc>=0.75?Math.round(ROUTE_BASE*D.mult*0.4*Math.max(0,1-secs/30)):0;
+  const ok=acc>=0.75; if(ok)G.streak++;else G.streak=0; const st=ok?streakBonus():0;
+  const pts=Math.round(base)+sp+st;
+  G.score+=pts; G.results.push({kind:"route",from:Q.from,to:Q.to,ok,pts,acc,secs});
+  svgEl("polyline",{points:ptsAttr(best.pts),fill:"none",stroke:"#1E8A4C","stroke-width":7,"stroke-dasharray":"16 10","stroke-linecap":"round"});
+  if(!DIFFS[G.diff].pinDest) pin(Q.to,"#D2381F","B");
+  mapimg.src="map-labeled.jpg";
+  const verdict=acc>=0.9?"Optimal route":acc>=0.75?"Good route":acc>=0.5?"Long way around":"Off the roads";
+  const ft=v=>fmt(v*FT_PER_PX)+" ft";
+  const eta=s=>{const t=s*FT_PER_PX/22;return t<60?Math.round(t)+" s":Math.floor(t/60)+" min "+Math.round(t%60)+" s";};
+  const detail=`Your line ${ft(pl)} · best ${ft(best.len)} (≈${eta(best.len)} at 15 mph). On roads ${Math.round(onRoad*100)}% · matches best ${Math.round(match*100)}%.`;
+  revealFeedback(acc>=0.75?true:acc>=0.5?"mid":false,verdict,detail+`<div class="legend" style="margin-top:6px"><span><i style="background:#1F5FD1"></i>Your route</span><span><i style="background:#1E8A4C"></i>Fastest route</span></div>`,pts,[`${Math.round(acc*100)}% of ${fmt(ROUTE_BASE*D.mult)}`,sp?`+${sp} speed`:"",st?`+${st} streak`:""]);
+  updateCursor(); panbtn.hidden=true;
+}
+function skip(){const Q=q();G.answered=true;G.streak=0;
+  if(Q.kind==="route"){G.results.push({kind:"route",from:Q.from,to:Q.to,ok:false,pts:0,acc:0,skipped:true});clearOverlay();svgEl("polyline",{points:ptsAttr(Q.best.pts),fill:"none",stroke:"#1E8A4C","stroke-width":7,"stroke-dasharray":"16 10"});pin(Q.from,"#1F5FD1","A");pin(Q.to,"#D2381F","B");mapimg.src="map-labeled.jpg";revealFeedback(false,"Skipped",`Fastest route is ${fmt(Q.best.len*FT_PER_PX)} ft, shown dashed.`,0,[]);}
+  else {G.results.push({kind:Q.kind,loc:Q.loc,ok:false,pts:0,skipped:true});clearOverlay();ring(Q.loc,"#D2381F");mapimg.src="map-labeled.jpg";focusOn(Q.loc.x,Q.loc.y,Math.max(V.s,0.6));revealFeedback(false,"Skipped",`${esc(Q.loc.label)}${extra(Q.loc)}`,0,[]);}
+  panbtn.hidden=true;updateCursor();}
+function revealFeedback(ok,title,html,pts,parts){
+  const cls=ok===true?"good":ok==="mid"?"mid":"bad";
+  const last=G.i===G.qs.length-1;
+  const fb=el(`<div class="feedback ${cls}"><h3>${esc(title)} · <span class="pts">+${fmt(pts)}</span></h3><div>${html}</div>${parts.filter(Boolean).length?`<p class="note" style="margin:4px 0 0">${parts.filter(Boolean).join(" · ")}</p>`:""}
+    <div class="row" style="margin-top:10px"><button class="btn primary grow" id="nextbtn">${last?"Finish shift":"Next call"}</button></div></div>`);
+  renderPlay(fb); const nb=document.getElementById("nextbtn"); nb.onclick=()=>{ if(last) finish(); else {G.i++;showQ();} }; nb.focus({preventScroll:true});
+}
+
+/* ---------- finish & leaderboard ---------- */
+async function finish(){clearInterval(tick); if(!G)return home();
+  const R=G.results, played=R.length; const byCat={};
+  for(const r of R){const c=r.kind==="route"?"route":r.loc.cat;byCat[c]=byCat[c]||{n:0,ok:0,pts:0};byCat[c].n++;if(r.ok)byCat[c].ok++;byCat[c].pts+=r.pts;}
+  const misses=R.filter(r=>!r.ok);
+  S.screen="done"; document.body.classList.remove("playing"); mapimg.src="map-labeled.jpg"; clearOverlay(); fit(); setTag("Full labeled map");
+  const rows=Object.entries(byCat).map(([c,v])=>`<tr><td>${c==="route"?"Routes":CATS[c].name}</td><td class="n">${v.ok}/${v.n}</td><td class="n">${fmt(v.pts)}</td></tr>`).join("");
+  const final=Math.round(G.score);
+  rail.replaceChildren(el(`<div style="display:contents">${brandHTML()}
+    <div class="card callcard"><p class="eyebrow">Shift complete · ${DIFFS[G.diff].name} · ${MODES[G.mode].name}</p>
+      <p class="prompt" style="font-size:44px;font-family:var(--f-mono)">${fmt(final)} <span style="font-size:18px;color:var(--muted)">pts</span></p>
+      <p class="sub">${R.filter(r=>r.ok).length} of ${played} calls handled cleanly.</p>
+      <table style="margin-top:8px"><thead><tr><th>Category</th><th class="n">Right</th><th class="n">Pts</th></tr></thead><tbody>${rows||`<tr><td colspan="3">No calls answered.</td></tr>`}</tbody></table>
+      ${misses.length?`<details style="margin-top:10px" open><summary>Review misses (${misses.length})</summary><ul class="misslist">${misses.map(r=>r.kind==="route"?`<li>Route ${esc(r.from.label)} → ${esc(r.to.label)}: ${Math.round((r.acc||0)*100)}% accuracy</li>`:`<li><b>${esc(r.loc.label)}</b>${r.loc.name&&r.loc.name!==r.loc.label?" · "+esc(r.loc.name):""}</li>`).join("")}</ul></details>`:""}
+      <p class="note" id="savestate" style="margin-top:8px"></p>
+      <div class="row" style="margin-top:8px"><button class="btn primary grow" id="againbtn">Run another shift</button><button class="btn" id="homebtn">Menu</button></div>
+    </div>
+    <div class="card" id="lbcard"></div></div>`));
+  document.getElementById("againbtn").onclick=startShift; document.getElementById("homebtn").onclick=home;
+  S.lbTab=G.diff; renderLB();
+  const res=await saveScore(G.diff,G.mode,final,played); const ss=document.getElementById("savestate"); if(ss) ss.textContent=res;
+  G=null;
+}
+
+let DB=null, USER=null, MYID=null, LB={}, lbUnsub=null, lbState="loading";
+(async()=>{ try{ if(!window.claude||!window.claude.use){lbState="off";renderLBIfShown();return;}
+  const [db,user]=await Promise.all([claude.use("db"),claude.use("user")]); DB=db; USER=user;
+  if(USER){try{MYID=await USER.id();}catch(e){}}
+  if(!DB){lbState="off";renderLBIfShown();return;}
+  const timer=setTimeout(()=>{if(lbState==="loading"){lbState="slow";renderLBIfShown();}},10000);
+  lbUnsub=DB.collection("scores").onSnapshot(snap=>{clearTimeout(timer);LB={};snap.docs.forEach(d=>{LB[d.id]=d.data();});if(!snap.metadata.fromCache)lbState="ok";else if(lbState==="loading")lbState="ok";renderLBIfShown();},
+    err=>{clearTimeout(timer);lbState="off";renderLBIfShown();});
+ }catch(e){lbState="off";renderLBIfShown();} })();
+function renderLBIfShown(){if(document.getElementById("lbcard"))renderLB();}
+async function renderLB(){const card=document.getElementById("lbcard");if(!card)return;const tab=S.lbTab;
+  const local=store.get("best",{});
+  let body="";
+  if(lbState==="off"){body=`<p class="note">Scores are saved in this browser. Your best on ${DIFFS[tab].name}: <b class="pts">${fmt((local[tab]||{}).score||0)}</b></p>`;}
+  else if(lbState==="loading"){body=`<p class="note">Loading the team board…</p>`;}
+  else{ const rows=Object.entries(LB).filter(([id,v])=>v&&v[tab]&&typeof v[tab].score==="number").map(([id,v])=>({id,...v[tab]})).sort((a,b)=>b.score-a.score).slice(0,25);
+    if(!rows.length) body=`<p class="note">No ${DIFFS[tab].name} scores yet. Finish a ${DIFFS[tab].name} shift to claim the top spot.</p>`;
+    else{ let ps={}; try{ if(USER) ps=await USER.profiles(rows.map(r=>r.id)); }catch(e){}
+      body=`<table><thead><tr><th>#</th><th>Responder</th><th class="n">Best</th></tr></thead><tbody></tbody></table>${lbState==="slow"?`<p class="note">The board may be out of date; still reaching the server.</p>`:""}`;
+      setTimeout(()=>{const tb=card.querySelector("tbody");if(!tb)return;rows.forEach((r,i)=>{const p=ps[r.id]||{};const tr=document.createElement("tr");tr.className="lb-row"+(r.id===MYID?" lb-me":"");
+        const td1=document.createElement("td");td1.textContent=i+1;const td2=document.createElement("td");
+        if(p.avatarUrl){const im=document.createElement("img");im.className="avatar";im.alt="";im.src=p.avatarUrl;td2.appendChild(im);}
+        td2.appendChild(document.createTextNode((p.name||"Responder")+(r.id===MYID?" (you)":"")));
+        const sm=document.createElement("div");sm.className="note";sm.textContent=`${MODES[r.mode]?MODES[r.mode].name:""} · ${r.shifts||1} shift${(r.shifts||1)>1?"s":""}`;td2.appendChild(sm);
+        const td3=document.createElement("td");td3.className="n";td3.textContent=fmt(r.score);tr.append(td1,td2,td3);tb.appendChild(tr);});},0);
+    } }
+  card.innerHTML=`<p class="eyebrow">Your best scores</p><div class="tabs" role="tablist">${Object.keys(DIFFS).map(d=>`<button role="tab" aria-selected="${d===tab}" data-t="${d}">${DIFFS[d].name}</button>`).join("")}</div>${body}`;
+  card.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{S.lbTab=b.dataset.t;renderLB();});
+}
+async function saveScore(diff,mode,score,played){
+  const local=store.get("best",{}); const prev=(local[diff]||{}).score||0;
+  if(score>prev){local[diff]={score,mode};store.set("best",local);}
+  if(!DB||!MYID) return score>prev?"New personal best saved on this device.":"";
+  try{ const ref=DB.doc("scores/"+MYID); const cur=(await ref.get()).data()||{};
+    const old=cur[diff]||{}; const next={...cur}; const shifts=(old.shifts||0)+1;
+    if(!old.score||score>old.score) next[diff]={score,mode,shifts,at:new Date().toISOString()}; else next[diff]={...old,shifts};
+    await ref.set(next);
+    return (!old.score||score>old.score)?"New best! Posted to the team leaderboard.":`Your team-board best stays at ${fmt(old.score)}.`;
+  }catch(e){ return e&&e.code==="invalid_argument"?"You can view the board, but your access level can't post scores.":"Couldn't reach the team board; score kept on this device."; }
+}
+
+/* ---------- home & study ---------- */
+function brandHTML(){return `<header class="brand"><img class="logo" src="ems-logo.png" alt="UTD Campus EMS logo" width="64" height="66"><div><h1>UTD Campus Run</h1><p>UTD Campus EMS · location drills</p></div></header><div class="livery" aria-hidden="true"></div>`;}
+function home(){S.screen="home";G=null;clearInterval(tick);document.body.classList.remove("playing");clearOverlay();mapimg.src="map-labeled.jpg";fit();setTag("UTD campus map · updated 02.05.24");panbtn.hidden=true;updateCursor();
+  const d=S.diff;
+  const ptsRows=Object.entries(CATS).map(([k,c])=>`<tr><td>${c.name}</td>${Object.keys(DIFFS).map(dd=>`<td class="n">${DIFFS[dd].cats.includes(k)?fmt(c.pts*DIFFS[dd].mult):"—"}</td>`).join("")}</tr>`).join("");
+  rail.replaceChildren(el(`<div style="display:contents">${brandHTML()}
+   <div class="card"><p class="eyebrow">1 · Difficulty</p><div class="seg three">${Object.entries(DIFFS).map(([k,v])=>`<button class="opt" data-d="${k}" aria-pressed="${k===d}"><b>${v.name}</b><span>${v.desc} · ×${v.mult}</span></button>`).join("")}</div>
+   <p class="eyebrow" style="margin-top:12px">2 · Drill</p><div class="seg three">${Object.entries(MODES).map(([k,v])=>`<button class="opt" data-m="${k}" aria-pressed="${k===S.mode}"><b>${v.name}</b><span>${v.desc}</span></button>`).join("")}</div>
+   <div class="row" style="margin-top:12px"><button class="btn primary grow" id="gobtn">Start shift · ${SHIFT_LEN} calls</button><button class="btn" id="studybtn">Study map</button></div></div>
+   <div class="card"><p class="eyebrow">Points per correct answer</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>Category</th>${Object.values(DIFFS).map(v=>`<th class="n">${v.name}</th>`).join("")}</tr></thead><tbody>${ptsRows}</tbody></table></div>
+    <details style="margin-top:8px"><summary>How scoring works</summary><ul class="misslist">
+     <li><b>Name It</b> pays the full category value. <b>Find It</b> pays ${FIND_FACTOR*100}%. A hint halves the value.</li>
+     <li><b>Speed bonus:</b> up to +50% for answering fast (within 20 s for Name It, 15 s for Find It).</li>
+     <li><b>Streak bonus:</b> +5 from the 3rd clean call in a row, building to +25.</li>
+     <li>Codes and full names both count (e.g. <code>SSB</code> or “Student Services Building”). Lots take “Lot T” or “T”. Phases take “Phase 3” or “3”.</li>
+     <li>Easy and Medium show apartment building numbers and ask for the <b>phase</b>. Only Hard hides the numbers and asks for the <b>building number</b>.</li></ul></details></div>
+   <div class="card" id="lbcard"></div></div>`));
+  rail.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{S.diff=b.dataset.d;store.set("diff",S.diff);S.lbTab=S.diff;home();});
+  rail.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{S.mode=b.dataset.m;store.set("mode",S.mode);home();});
+  document.getElementById("gobtn").onclick=startShift; document.getElementById("studybtn").onclick=study;
+  renderLB();
+}
+let studyLabels=true, studyPick=null;
+function study(){S.screen="study";clearOverlay();mapimg.src=studyLabels?"map-labeled.jpg":"map-blank.jpg";setTag("Tap any location to see its name");
+  LOCS.forEach(l=>svgEl("circle",{cx:l.x,cy:l.y,r:5,fill:CATCOL[l.cat],stroke:"#fff","stroke-width":2,opacity:.9}));
+  if(studyPick) ring(studyPick,"#1F5FD1");
+  const p=studyPick;
+  rail.replaceChildren(el(`<div style="display:contents">${brandHTML()}
+    <div class="card"><p class="eyebrow">Study map</p>
+     ${p?`<p class="prompt">${esc(p.label)}</p><p class="sub">${esc(p.name&&p.name!==p.label?p.name:"Code only on the map")}</p><p class="note" style="margin-top:6px">${CATS[p.cat].name}${p.ph&&p.cat==="apt"?` · Phase ${esc(p.ph)}`:""}${p.cat==="phase"?` · buildings ${phaseRange(p.ph)}`:""} · ${CATS[p.cat].pts} pts base · access from ${esc(edges[ACCESS.get(p.id).e].name)}</p>`:`<p class="sub">Tap a dot on the map to see the code, full name and category.</p>`}
+     <div class="row" style="margin-top:10px"><button class="btn small" id="lblbtn">${studyLabels?"Hide labels":"Show labels"}</button><button class="btn small" id="backbtn">Menu</button></div></div>
+    <div class="card"><p class="eyebrow">Dot colors</p><div class="legend">${Object.entries(CATS).map(([k,c])=>`<span><i style="background:${CATCOL[k]};height:10px;width:10px;border-radius:50%"></i>${c.name}</span>`).join("")}</div></div></div>`));
+  document.getElementById("lblbtn").onclick=()=>{studyLabels=!studyLabels;study();};
+  document.getElementById("backbtn").onclick=()=>{studyPick=null;home();};
+}
+const CATCOL={acad:"#E8731C",res:"#1E8A4C",phase:"#C2185B",ps:"#9A2E14",lot:"#6B7785",field:"#2BA89A",apt:"#7A3FB0"};
+function studyTap(m){let near=null,nd=Infinity;for(const o of LOCS){const d=dist(m,[o.x,o.y]);if(d<nd){nd=d;near=o;}} if(near&&nd<60){studyPick=near;study();}}
+
+/* boot */
+mapimg.onload=()=>{}; fit(); home();
+</script>
+
+</body>
+</html>
