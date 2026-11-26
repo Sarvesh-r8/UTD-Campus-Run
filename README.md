@@ -2,7 +2,7 @@
 
 A location-drill game for UTD Campus EMS. Responders learn the UT Dallas campus by naming and finding buildings, parking, apartment phases and fields on the official campus map.
 
-**Play:** https://sarvesh-r8.github.io/utd-campus-run/
+**Play:** https://sarvesh-r8.github.io/UTD-Campus-Run/
 
 ## Modes
 - **Name It**: a location is circled on the map; type its code or full name (e.g. `SSB` or "Student Services Building").
